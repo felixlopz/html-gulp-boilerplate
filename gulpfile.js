@@ -8,7 +8,8 @@ var settings = {
 	scripts: true,
 	polyfills: true,
 	styles: true,
-	svgs: true,
+	svgs: false,
+	images: false,
 	copy: true,
 	reload: true
 };
@@ -34,6 +35,10 @@ var paths = {
 		input: 'src/svg/*.svg',
 		output: 'dist/svg/'
 	},
+	images: {
+		input: 'src/images/*.{jpeg,png,gif,svg}',
+		output: 'dist/images/'
+	},
 	copy: {
 		input: 'src/copy/**/*',
 		output: 'dist/'
@@ -47,7 +52,15 @@ var paths = {
  */
 
 var banner = {
-	main:
+	full:
+		'/*!\n' +
+		' * <%= package.name %> v<%= package.version %>\n' +
+		' * <%= package.description %>\n' +
+		' * (c) ' + new Date().getFullYear() + ' <%= package.author.name %>\n' +
+		' * <%= package.license %> License\n' +
+		' * <%= package.repository.url %>\n' +
+		' */\n\n',
+	min:
 		'/*!' +
 		' <%= package.name %> v<%= package.version %>' +
 		' | (c) ' + new Date().getFullYear() + ' <%= package.author.name %>' +
@@ -86,6 +99,9 @@ var minify = require('cssnano');
 // SVGs
 var svgmin = require('gulp-svgmin');
 
+// Imagemin
+var imagemin = require('gulp-imagemin');
+
 // BrowserSync
 var browserSync = require('browser-sync');
 
@@ -112,13 +128,13 @@ var cleanDist = function (done) {
 
 // Repeated JavaScript tasks
 var jsTasks = lazypipe()
-	.pipe(header, banner.main, {package: package})
+	.pipe(header, banner.full, {package: package})
 	.pipe(optimizejs)
 	.pipe(dest, paths.scripts.output)
 	.pipe(rename, {suffix: '.min'})
 	.pipe(uglify)
 	.pipe(optimizejs)
-	.pipe(header, banner.main, {package: package})
+	.pipe(header, banner.min, {package: package})
 	.pipe(dest, paths.scripts.output);
 
 // Lint, minify, and concatenate scripts
@@ -192,13 +208,17 @@ var buildStyles = function (done) {
 			outputStyle: 'expanded',
 			sourceComments: true
 		}))
+		// .pipe(prefix({
+		// 	cascade: true,
+		// 	remove: true
+		// }))
 		.pipe(postcss([
 			prefix({
 				cascade: true,
 				remove: true
 			})
 		]))
-		.pipe(header(banner.main, {package: package}))
+		.pipe(header(banner.full, {package: package}))
 		.pipe(dest(paths.styles.output))
 		.pipe(rename({suffix: '.min'}))
 		.pipe(postcss([
@@ -208,6 +228,12 @@ var buildStyles = function (done) {
 				}
 			})
 		]))
+		// .pipe(minify({
+		// 	discardComments: {
+		// 		removeAll: true
+		// 	}
+		// }))
+		.pipe(header(banner.min, {package: package}))
 		.pipe(dest(paths.styles.output));
 
 };
@@ -224,6 +250,16 @@ var buildSVGs = function (done) {
 		.pipe(dest(paths.svgs.output));
 
 };
+
+var minifyImages = function(done){
+	// Make sure this feature is activated before running
+	if (!settings.images) return done();
+
+	// Minify Images
+	return src(paths.images.input)
+		.pipe(imagemin())
+		.pipe(dest(paths.images.output));
+}
 
 // Copy static files into output folder
 var copyFiles = function (done) {
@@ -282,6 +318,7 @@ exports.default = series(
 		lintScripts,
 		buildStyles,
 		buildSVGs,
+		minifyImages,
 		copyFiles
 	)
 );
